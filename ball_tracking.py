@@ -6,6 +6,8 @@ import argparse
 import cv2
 import imutils
 import time
+import random
+import threading
 
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
@@ -17,8 +19,15 @@ args = vars(ap.parse_args())
 # define the lower and upper boundaries of the "green"
 # ball in the HSV color space, then initialize the
 # list of tracked points
-greenLower = (29, 86, 6)
-greenUpper = (64, 255, 255)
+blueLower = np.array([110,50,50])
+blueUpper = np.array([130,255,255])
+
+# redLower = np.array([])
+# redUpper = np.array([])
+
+# greenLower = np.array([])
+# greenUpper = np.array([])
+
 pts = deque(maxlen=args["buffer"])
 
 # if a video path was not supplied, grab the reference
@@ -32,8 +41,24 @@ else:
 
 # allow the camera or video file to warm up
 time.sleep(2.0)
+draw = 1
+point = 0
+x_1 = 0
+y_1 = 0
+timer = 0
+timeCount = 0
+endgame = True
+
+def sedEnd():
+    endgame = True
+    
 # keep looping
 while True:
+    # while timer:
+    #     time.sleep(1)
+    #     timer -= 1
+    
+  
     # grab the current frame
     frame = vs.read()
 
@@ -54,15 +79,32 @@ while True:
     # construct a mask for the color "green", then perform
     # a series of dilations and erosions to remove any small
     # blobs left in the mask
-    mask = cv2.inRange(hsv, greenLower, greenUpper)
-    mask = cv2.erode(mask, None, iterations=2)
-    mask = cv2.dilate(mask, None, iterations=2)
+    mask = cv2.inRange(hsv, blueLower, blueUpper)
+    mask = cv2.erode(mask, None, iterations=4)
+    mask = cv2.dilate(mask, None, iterations=4)
     # find contours in the mask and initialize the current
     # (x, y) center of the ball
     cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL,
                             cv2.CHAIN_APPROX_SIMPLE)
     cnts = imutils.grab_contours(cnts)
     center = None
+
+   
+
+    if(draw==1):
+        x_1 = random.randint(100,400)
+        y_1 = random.randint(50,400)
+        draw = 0
+    if(endgame==False):
+        timeCount = int(time.time()-timer)
+        cv2.circle(frame, (int(x_1), int(y_1)), int(30),(0, 0, 255), 2)
+    
+
+    
+
+        
+
+    
 
     # only proceed if at least one contour was found
     if len(cnts) > 0:
@@ -74,13 +116,26 @@ while True:
         M = cv2.moments(c)
         center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
 
+
+
         # only proceed if the radius meets a minimum size
         if radius > 10:
             # draw the circle and centroid on the frame,
             # then update the list of tracked points
+            print("frame {}".format(frame.shape))
             cv2.circle(frame, (int(x), int(y)), int(radius),
                        (0, 255, 255), 2)
             cv2.circle(frame, center, 5, (0, 0, 255), -1)
+         
+        comparm_x = [x_1 - 30,x_1+30]
+        comparm_y = [y_1 - 30,y_1 + 30] 
+        x_c, y_c = center
+    
+   
+        if((comparm_x[0]< x_c and comparm_x[1] > x_c) and (comparm_y[0] < y_c and  comparm_y[1] > y_c)):
+            point = point +1
+            draw = 1
+
 
     # update the points queue
     pts.appendleft(center)
@@ -97,8 +152,32 @@ while True:
         cv2.line(frame, pts[i - 1], pts[i], (0, 0, 255), thickness)
 
     # show the frame to our screen
+    # frame = cv2.flip(frame,1)
+    if endgame == True and timer == 0:
+         cv2.putText(frame,"Start",(180,250),cv2.FONT_HERSHEY_SIMPLEX,2,(255,50,200),2)
+
+    elif endgame == True:
+         cv2.putText(frame,"Try Agian",(180,250),cv2.FONT_HERSHEY_SIMPLEX,2,(255,50,200),2)    
+   
+    cv2.putText(frame,"point: {}".format(point),(400,50),cv2.FONT_HERSHEY_SIMPLEX,1,(0,0,0),2)
+    cv2.putText(frame,"time: {}".format(timeCount),(10,50),cv2.FONT_HERSHEY_SIMPLEX,1,(0,0,0),2)
+    cv2.namedWindow("Frame", cv2.WND_PROP_FULLSCREEN) 
+    cv2.setWindowProperty("Frame",cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
     cv2.imshow("Frame", frame)
     key = cv2.waitKey(1) & 0xFF
+ 
+    if timeCount >=30:
+        endgame = True
+
+    if key == ord("r"):
+        timer = time.time()
+        endgame = False
+        point = 0
+
+    if key == ord("s"):
+        timer = time.time()
+        endgame = False
+
 
     # if the 'q' key is pressed, stop the loop
     if key == ord("q"):
